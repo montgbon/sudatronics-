@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Run &amp; Win - LIVE</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#121212;color:#fff;font-family:Arial;display:flex;flex-direction:column;align-items:center;padding:15px 8px;min-height:100vh}
+h1{color:#ffcc00;font-size:22px;text-align:center;margin-bottom:8px;cursor:pointer}
+#live-badge{background:#00ff66;color:#000;padding:5px 12px;border-radius:20px;font-size:12px;font-weight:bold;margin-bottom:8px}
+#timer-public-wrap{background:#1e1e1e;border:2px solid #ffcc00;border-radius:10px;padding:12px 15px;margin-bottom:10px;width:min(360px,100%);text-align:center}
+#timer-public{font-size:20px;font-weight:bold;color:#ffcc00;letter-spacing:1px;margin-top:4px;direction:ltr}
+#game-container{position:relative;width:min(360px,100%);aspect-ratio:360/500;background:#222;border:3px solid #ffcc00;border-radius:10px;overflow:hidden}
+canvas{display:block;width:100%;height:100%;background:#1e1e2f}
+.ui-panel{position:absolute;top:10px;left:8px;right:8px;display:flex;justify-content:space-between;font-size:14px;font-weight:bold;z-index:2;pointer-events:none}
+#mobile-controls{display:flex;justify-content:center;gap:15px;margin-top:15px;direction:ltr}
+#mobile-controls button{width:75px;height:60px;border:2px solid #ffcc00;border-radius:12px;background:#252525;color:#fff;font-size:27px}
+#overlay{position:absolute;inset:0;background:rgba(0,0,0,0.92);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:20px;z-index:10}
+#overlay h2{color:#ffcc00;margin-bottom:12px}
+#overlay button,.btn{padding:12px 20px;font-size:16px;background:#ffcc00;border:none;border-radius:8px;cursor:pointer;font-weight:bold;margin-top:8px}
+input{padding:11px;margin:6px 0;width:100%;border-radius:8px;border:none;text-align:center;font-size:15px}
+.card{background:#222;padding:15px;border-radius:12px;margin:12px auto;width:min(360px,100%)}
+table{width:100%;border-collapse:collapse;font-size:14px}
+td,th{padding:8px;border-bottom:1px solid #333;text-align:center}
+.hidden{display:none!important}
+.timer-edit-grid{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;margin:10px 0}
+.timer-edit-grid input{border:2px solid #ffcc00;background:#111;color:#fff}
+.small-label{font-size:11px;color:#aaa}
+</style>
+</head>
+<body>
+<h1 id="main-title">🏆 مسابقة فري فاير الكبرى 🏆</h1>
+<div id="live-badge">🟢 LIVE - متصل بـ sudatronics</div>
+<div id="timer-public-wrap">
+<div class="label">⏳ الوقت المتبقي للمسابقة (ظاهر للكل)</div>
+<div id="timer-public">00 يوم 00:00:00</div>
+<div id="timer-status-public" style="font-size:11px;color:#888;margin-top:2px"></div>
+</div>
+<div id="game-container">
+<canvas id="gameCanvas" width="360" height="500"></canvas>
+<div class="ui-panel"><div>النقاط: <span id="score">0</span></div><div>🪙 <span id="coins">0</span></div></div>
+<div id="overlay">
+<div id="reg-form">
+<h2>سجل عشان تلعب</h2>
+<input id="p-name" placeholder="اسمك">
+<input id="p-phone" placeholder="رقم الواتساب">
+<button onclick="doRegister()">دخول للمسابقة</button>
+<p id="status" style="font-size:12px;color:#aaa;margin-top:8px">متصل بالسيرفر ✅</p>
+</div>
+<div id="game-over-screen" class="hidden">
+<h2 id="overlay-title">جاهز؟</h2>
+<p id="overlay-desc"></p>
+<p style="margin-top:8px;">مجموعك: <b id="total-score-view">0</b></p>
+<button id="start-button" onclick="startGame()">ابدأ اللعب الآن</button>
+</div>
+</div>
+</div>
+<div id="mobile-controls"><button onclick="moveLeft()">⬅️</button><button onclick="jump()">⬆️</button><button onclick="moveRight()">➡️</button></div>
+<div class="card"><h3 style="color:#ffcc00;margin-bottom:8px;">📊 الترتيب المباشر LIVE</h3><div id="public-board">جاري التحميل...</div></div>
+<div id="admin-view" class="card hidden" style="border:2px solid red;">
+<h2>🔒 لوحة المدير</h2>
+<div id="admin-login"><input id="admin-pass" type="password" placeholder="كلمة المرور 1234"><button class="btn" onclick="checkAdmin()">دخول</button><button class="btn" style="background:#555;color:#fff;" onclick="closeAdmin()">رجوع</button></div>
+<div id="admin-panel" class="hidden">
+<div style="border:1px solid #444;padding:10px;border-radius:8px;margin-bottom:12px;">
+<h4 style="color:#ffcc00;">🔑 تغيير كلمة المرور (انت بس)</h4>
+<input id="new-pass" placeholder="كلمة المرور الجديدة">
+<button class="btn" style="font-size:13px;background:#00ccff;" onclick="changePassword()">حفظ الجديدة</button>
+<p style="font-size:11px;color:#aaa">الحالية: <span id="current-pass-show"></span></p>
+</div>
+<div style="border:1px solid #444;padding:10px;border-radius:8px;">
+<h4 style="color:#ffcc00;">⏰ تعديل المؤقت - انت بس تعدل والكل يشوف</h4>
+<div class="timer-edit-grid">
+<div><input id="edit-days" type="number" min="0"><div class="small-label">أيام</div></div>
+<div><input id="edit-hours" type="number" min="0" max="23"><div class="small-label">ساعات</div></div>
+<div><input id="edit-mins" type="number" min="0" max="59"><div class="small-label">دقائق</div></div>
+<div><input id="edit-secs" type="number" min="0" max="59"><div class="small-label">ثواني</div></div>
+</div>
+<button class="btn" style="font-size:13px;" onclick="applyCustomTime()">✅ تطبيق للكل</button>
+<div style="margin-top:8px;display:flex;gap:5px;flex-wrap:wrap;">
+<button class="btn" style="font-size:12px;" onclick="startTimer()">▶️ شغل</button>
+<button class="btn" style="font-size:12px;" onclick="stopTimer()">⏸️ وقف</button>
+</div>
+<p style="margin-top:6px;font-size:12px">المؤقت: <span id="admin-timer"></span> | <span id="timer-status"></span></p>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:5px;margin:12px 0;">
+<button class="btn" style="font-size:13px;background:#ffcc00;" onclick="resetScoresOnly()">🔄 تصفير نقاط</button>
+<button class="btn" style="font-size:13px;background:#00ff66;" onclick="exportExcel()">📥 Excel</button>
+<button class="btn" style="font-size:13px;background:#ff4444;color:#fff;" onclick="resetAll()">🗑️ مسح الكل</button>
+</div>
+<table><thead><tr><th>#</th><th>الاسم</th><th>واتساب</th><th>نقاط</th></tr></thead><tbody id="admin-board"></tbody></table>
+</div>
+</div>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-app.js";
+import { getFirestore, collection, doc, setDoc, getDoc, getDocs, onSnapshot, query, orderBy, writeBatch } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js";
+const firebaseConfig = {
+  apiKey: "AIzaSyCojB5o7mu7IRl6teN-wWIKPb-QVmL-JhA",
+  authDomain: "sudatronics.firebaseapp.com",
+  projectId: "sudatronics",
+  storageBucket: "sudatronics.firebasestorage.app",
+  messagingSenderId: "130742976124",
+  appId: "1:130742976124:web:b275e85cecbd0da33493f9",
+  measurementId: "G-VV7D5NGMYM"
+};
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const playersCol = collection(db, "players");
+const stateDoc = doc(db, "config", "gameState");
+window._fb = { db, playersCol, stateDoc, collection, doc, setDoc, getDoc, getDocs, onSnapshot, query, orderBy, writeBatch, isFirebaseReady:true };
+</script>
+<script>
+let ADMIN_PASSWORD = localStorage.getItem('rw_admin_pass') || "1234";
+let players = [];
+let currentPlayer = JSON.parse(localStorage.getItem('rw_current') || 'null');
+let gameState = {endTime: Date.now()+7*24*60*60*1000, running:true};
+function formatTime(ms){
+  if(ms<=0) return "00 يوم 00:00:00";
+  let totalSec = Math.floor(ms/1000);
+  let days = Math.floor(totalSec / 86400); totalSec%=86400;
+  let hours = Math.floor(totalSec / 3600); totalSec%=3600;
+  let mins = Math.floor(totalSec / 60); let secs = totalSec % 60;
+  return `${String(days).padStart(2,'0')} يوم ${String(hours).padStart(2,'0')}:${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
+}
+async function doRegister(){
+  let n=document.getElementById('p-name').value.trim();
+  let p=document.getElementById('p-phone').value.trim();
+  if(!n||!p) return alert('اكتب اسمك والرقم');
+  const fb = window._fb;
+  document.getElementById('status').innerText='جاري التسجيل...';
+  try{
+    const ref = fb.doc(fb.db, "players", p);
+    const snap = await fb.getDoc(ref);
+    if(snap.exists()) currentPlayer = snap.data();
+    else { currentPlayer={name:n,phone:p,score:0,created:Date.now()}; await fb.setDoc(ref, currentPlayer); }
+    localStorage.setItem('rw_current', JSON.stringify(currentPlayer));
+    afterLogin();
+  }catch(e){ alert("خطأ: "+e.message); }
+}
+function afterLogin(){
+  document.getElementById('reg-form').classList.add('hidden');
+  document.getElementById('game-over-screen').classList.remove('hidden');
+  document.getElementById('overlay-title').innerText='أهلا '+currentPlayer.name+' 🔥';
+  document.getElementById('total-score-view').innerText=currentPlayer.score;
+  document.getElementById('overlay-desc').innerText='مجموعك: '+currentPlayer.score;
+}
+function initLive(){
+  const fb = window._fb;
+  const q = fb.query(fb.playersCol, fb.orderBy("score","desc"));
+  fb.onSnapshot(q, (snap)=>{ players=[]; snap.forEach(d=>players.push(d.data())); renderBoards(); });
+  fb.onSnapshot(fb.stateDoc, (snap)=>{
+    if(snap.exists()){ gameState = snap.data(); localStorage.setItem('rw_gameState', JSON.stringify(gameState)); renderTimerInputs(); }
+    else { fb.setDoc(fb.stateDoc, gameState); }
+  });
+}
+function renderBoards(){
+  let sorted=[...players].sort((a,b)=>b.score-a.score);
+  document.getElementById('public-board').innerHTML = sorted.map((p,i)=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #333;"><span>${i+1}. ${p.name}</span><b style="color:#ffcc00">${p.score}</b></div>`).join('') || 'لا يوجد لاعبين بعد';
+  document.getElementById('admin-board').innerHTML = sorted.map((p,i)=>`<tr><td>${i+1}</td><td>${p.name}</td><td dir="ltr">${p.phone}</td><td>${p.score}</td></tr>`).join('');
+}
+async function saveGameState(){ localStorage.setItem('rw_gameState', JSON.stringify(gameState)); const fb=window._fb; await fb.setDoc(fb.stateDoc, gameState); }
+function startTimer(){ gameState.running=true; if(gameState.endTime<Date.now()) gameState.endTime=Date.now()+7*24*60*60*1000; saveGameState(); }
+function stopTimer(){ gameState.running=false; saveGameState(); }
+function renderTimerInputs(){
+  let diff=Math.max(0, gameState.endTime-Date.now());
+  let totalSec=Math.floor(diff/1000);
+  let days=Math.floor(totalSec/86400); totalSec%=86400;
+  let hours=Math.floor(totalSec/3600); totalSec%=3600;
+  let mins=Math.floor(totalSec/60); let secs=totalSec%60;
+  document.getElementById('edit-days').value=days; document.getElementById('edit-hours').value=hours; document.getElementById('edit-mins').value=mins; document.getElementById('edit-secs').value=secs;
+}
+function applyCustomTime(){
+  let d=parseInt(document.getElementById('edit-days').value)||0;
+  let h=parseInt(document.getElementById('edit-hours').value)||0;
+  let m=parseInt(document.getElementById('edit-mins').value)||0;
+  let s=parseInt(document.getElementById('edit-secs').value)||0;
+  let totalMs=(d*86400 + h*3600 + m*60 + s)*1000;
+  if(totalMs<=0) return alert('الوقت لازم أكبر من صفر');
+  gameState.endTime=Date.now()+totalMs; gameState.running=true; saveGameState();
+  alert(`✅ تم: ${d} يوم ${h}:${m}:${s}`);
+}
+function changePassword(){
+  let np=document.getElementById('new-pass').value.trim();
+  if(np.length<3) return alert('كلمة قصيرة');
+  ADMIN_PASSWORD=np; localStorage.setItem('rw_admin_pass', np);
+  document.getElementById('current-pass-show').innerText=np;
+  alert('✅ الجديدة: '+np); document.getElementById('new-pass').value='';
+}
+async function resetScoresOnly(){
+  if(!confirm('حتصفر النقاط بس؟')) return;
+  const fb=window._fb; const snap=await fb.getDocs(fb.playersCol); const batch=fb.writeBatch(fb.db); snap.forEach(d=> batch.update(d.ref,{score:0})); await batch.commit();
+  gameState.endTime=Date.now()+7*24*60*60*1000; gameState.running=true; saveGameState(); alert('✅ مسابقة جديدة');
+}
+async function resetAll(){
+  if(!confirm('متأكد تمسح الكل من السيرفر؟')) return;
+  if(prompt('اكتب كلمة المرور:')!==ADMIN_PASSWORD) return alert('غلط');
+  const fb=window._fb; const snap=await fb.getDocs(fb.playersCol); const batch=fb.writeBatch(fb.db); snap.forEach(d=> batch.delete(d.ref)); await batch.commit(); alert('🗑️ اتمسح');
+}
+function exportExcel(){
+  let csv="الاسم,واتساب,نقاط\n"; players.forEach(p=> csv+=`${p.name},${p.phone},${p.score}\n`);
+  let blob=new Blob([csv],{type:'text/csv'}); let url=URL.createObjectURL(blob); let a=document.createElement('a'); a.href=url; a.download='players.csv'; a.click();
+}
+const canvas=document.getElementById("gameCanvas"); const ctx=canvas.getContext("2d");
+const lanes=[60,180,300]; let currentLane=1, playerY=400, isJumping=false, jumpSpeed=0, gravity=0.6, score=0, coins=0, speed=4, gameOver=true, obstacles=[], coinItems=[], frameCount=0;
+window.moveLeft=()=>{ if(currentLane>0) currentLane--; }; window.moveRight=()=>{ if(currentLane<2) currentLane++; }; window.jump=()=>{ if(isJumping) return; isJumping=true; jumpSpeed=-12; };
+function resetGame(){ currentLane=1; playerY=400; isJumping=false; jumpSpeed=0; score=0; coins=0; speed=4; frameCount=0; obstacles=[]; coinItems=[]; document.getElementById("score").textContent="0"; document.getElementById("coins").textContent="0"; }
+window.startGame=()=>{ if(!gameState.running) return alert('المسابقة متوقفة'); if(!currentPlayer) return alert('سجل أولا'); resetGame(); gameOver=false; document.getElementById("overlay").style.display="none"; gameLoop(); };
+function update(){ if(gameOver) return; frameCount++; score++; document.getElementById("score").textContent=Math.floor(score/10); if(isJumping){ playerY+=jumpSpeed; jumpSpeed+=gravity; if(playerY>=400){ playerY=400; isJumping=false; } } if(frameCount%90===0) obstacles.push({x:lanes[Math.floor(Math.random()*3)]-20,y:-40,width:40,height:40}); if(frameCount%120===0) coinItems.push({x:lanes[Math.floor(Math.random()*3)]-10,y:-30,radius:10}); let px=lanes[currentLane]; obstacles.forEach(o=>o.y+=speed); coinItems.forEach(c=>c.y+=speed); obstacles=obstacles.filter(o=>o.y<550); coinItems=coinItems.filter(c=>c.y<550); for(let o of obstacles){ if(Math.abs(o.x+20-px)<25 && Math.abs(o.y+20-playerY)<25 && playerY>370){ endGame(); return; } } for(let i=coinItems.length-1;i>=0;i--){ let c=coinItems[i]; if(Math.abs(c.x+10-px)<25 && Math.abs(c.y-playerY)<25){ coins++; document.getElementById("coins").textContent=coins; coinItems.splice(i,1); } } }
+function draw(){ ctx.clearRect(0,0,360,500); ctx.strokeStyle="#333"; ctx.beginPath(); ctx.moveTo(120,0); ctx.lineTo(120,500); ctx.moveTo(240,0); ctx.lineTo(240,500); ctx.stroke(); ctx.fillStyle="#00ffcc"; ctx.fillRect(lanes[currentLane]-15,playerY-15,30,30); ctx.fillStyle="#ff4444"; obstacles.forEach(o=>ctx.fillRect(o.x,o.y,o.width,o.height)); ctx.fillStyle="#ffcc00"; coinItems.forEach(c=>{ ctx.beginPath(); ctx.arc(c.x+10,c.y,c.radius,0,Math.PI*2); ctx.fill(); }); }
+function gameLoop(){ if(gameOver) return; update(); draw(); requestAnimationFrame(gameLoop); }
+async function endGame(){
+  gameOver=true; let pts=Math.floor(score/10)+coins; currentPlayer.score+=pts;
+  const fb=window._fb; await fb.setDoc(fb.doc(fb.db,"players",currentPlayer.phone), currentPlayer);
+  localStorage.setItem('rw_current', JSON.stringify(currentPlayer));
+  document.getElementById("overlay-title").textContent="انتهت!"; document.getElementById("overlay-desc").textContent="جبت: "+pts; document.getElementById("total-score-view").textContent=currentPlayer.score; document.getElementById("overlay").style.display="flex"; document.getElementById("reg-form").classList.add('hidden'); document.getElementById("game-over-screen").classList.remove('hidden');
+}
+draw();
+setInterval(()=>{
+  let diff=gameState.endTime-Date.now();
+  let el=document.getElementById('timer-public'); let statusEl=document.getElementById('timer-status-public');
+  if(!gameState.running){ el.innerText="المسابقة متوقفة ⏸️"; statusEl.innerText="المدير وقف المسابقة"; }
+  else if(diff<=0){ el.innerText="انتهت المسابقة 🏁"; statusEl.innerText=""; }
+  else { el.innerText=formatTime(diff); statusEl.innerText="متبقي على النهاية - ظاهر للكل"; }
+  let at=document.getElementById('admin-timer'); if(at) at.innerText=formatTime(Math.max(0,diff));
+  let st=document.getElementById('timer-status'); if(st) st.innerText=gameState.running?'شغالة ✅':'متوقفة ⏸️';
+},1000);
+let clicks=0; document.getElementById('main-title').onclick=()=>{ clicks++; if(clicks>=5){ location.hash='#admin'; openAdmin(); } setTimeout(()=>clicks=0,3000); }
+function openAdmin(){ document.getElementById('admin-view').classList.remove('hidden'); document.getElementById('current-pass-show').innerText=ADMIN_PASSWORD; renderTimerInputs(); window.scrollTo(0,document.body.scrollHeight); }
+window.closeAdmin=()=>{ location.hash=''; document.getElementById('admin-view').classList.add('hidden'); }
+if(location.hash==='#admin') openAdmin();
+window.checkAdmin=()=>{ if(document.getElementById('admin-pass').value===ADMIN_PASSWORD){ document.getElementById('admin-login').classList.add('hidden'); document.getElementById('admin-panel').classList.remove('hidden'); renderTimerInputs(); } else alert('غلط - الحالية: '+ADMIN_PASSWORD); }
+setTimeout(()=>{ initLive(); if(currentPlayer){ document.getElementById('reg-form').classList.add('hidden'); document.getElementById('game-over-screen').classList.remove('hidden'); document.getElementById('overlay-title').innerText='أهلا '+currentPlayer.name; document.getElementById('total-score-view').innerText=currentPlayer.score; document.getElementById('overlay-desc').innerText='مجموعك: '+currentPlayer.score; } document.getElementById('current-pass-show').innerText=ADMIN_PASSWORD; renderTimerInputs(); }, 800);
+</script>
+</body>
+</html>
